@@ -3,6 +3,10 @@ import itertools
 from util.image_pool import ImagePool
 from .base_model import BaseModel
 from . import networks
+from util.metrics import *
+from util.util import tensor2im
+import matplotlib.pyplot as plt
+
 
 
 class CycleGANModel(BaseModel):
@@ -41,6 +45,8 @@ class CycleGANModel(BaseModel):
             parser.add_argument('--lambda_A', type=float, default=10.0, help='weight for cycle loss (A -> B -> A)')
             parser.add_argument('--lambda_B', type=float, default=10.0, help='weight for cycle loss (B -> A -> B)')
             parser.add_argument('--lambda_identity', type=float, default=0.5, help='use identity mapping. Setting lambda_identity other than 0 has an effect of scaling the weight of the identity mapping loss. For example, if the weight of the identity loss should be 10 times smaller than the weight of the reconstruction loss, please set lambda_identity = 0.1')
+            parser.add_argument('--metrics', type=str, default=None, action='append', help='Define a metric to be used. Pass in this argument multiple times to add multiple metrics. [SSIM |PSNR]')
+
 
         return parser
 
@@ -53,6 +59,14 @@ class CycleGANModel(BaseModel):
         BaseModel.__init__(self, opt)
         # specify the training losses you want to print out. The training/test scripts will call <BaseModel.get_current_losses>
         self.loss_names = ['D_A', 'G_A', 'cycle_A', 'idt_A', 'D_B', 'G_B', 'cycle_B', 'idt_B']
+        # specify the metrics you want to print out. The training/test scripts will call <BaseModel.get_current_metrics>
+        self.metric_names = []
+        if opt.metrics is not None:
+            for metric in opt.metrics:
+                if metric == "SSIM":
+                    self.metric_names += ['SSIM_fake_A', 'SSIM_fake_B', 'SSIM_rec_A', 'SSIM_rec_B']
+        #TODO: Add PSNR
+
         # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
         visual_names_A = ['real_A', 'fake_B', 'rec_A']
         visual_names_B = ['real_B', 'fake_A', 'rec_B']
@@ -107,6 +121,7 @@ class CycleGANModel(BaseModel):
         AtoB = self.opt.direction == 'AtoB'
         self.real_A = input['A' if AtoB else 'B'].to(self.device)
         self.real_B = input['B' if AtoB else 'A'].to(self.device)
+
         self.image_paths = input['A_paths' if AtoB else 'B_paths']
 
     def forward(self):
@@ -192,3 +207,38 @@ class CycleGANModel(BaseModel):
         self.backward_D_A()      # calculate gradients for D_A
         self.backward_D_B()      # calculate graidents for D_B
         self.optimizer_D.step()  # update D_A and D_B's weights
+
+    def calculate_metrics(self,dataset):
+        """Calculate metrics; called after the end of an epoch. Currently only implemented for CycleGANs"""
+        #TODO: ADD PSNR metric as well
+        if self.opt.metrics is None:
+            return
+        for metric in self.opt.metrics:
+            if metric == 'SSIM':
+                self.metric_SSIM_fake_A = 0
+                self.metric_SSIM_fake_B = 0
+                self.metric_SSIM_rec_A = 0
+                self.metric_SSIM_rec_B = 0
+            if metric == 'PSNR':
+                self.metric_PSNR_A = 0
+                self.metric_PSNR_B = 0
+        total_iters = 0
+        for i, data in enumerate(dataset):
+            self.set_input(data)
+            self.forward()
+            for metric in self.opt.metrics:
+                if metric == 'SSIM':
+                    self.metric_SSIM_fake_A += ssim(torch.Tensor(tensor2im(self.fake_A, first_only=False)).to(self.device), torch.Tensor(tensor2im(self.real_B, first_only=False)).to(self.device),size_average=False).cpu().float().sum()
+                    self.metric_SSIM_fake_B += ssim(torch.Tensor(tensor2im(self.fake_B, first_only=False)).to(self.device), torch.Tensor(tensor2im(self.real_A, first_only=False)).to(self.device),size_average=False).cpu().float().sum()
+                    self.metric_SSIM_rec_A += ssim(torch.Tensor(tensor2im(self.real_A, first_only=False)).to(self.device), torch.Tensor(tensor2im(self.rec_A, first_only=False)).to(self.device),size_average=False).cpu().float().sum()
+                    self.metric_SSIM_rec_B += ssim(torch.Tensor(tensor2im(self.real_B, first_only=False)).to(self.device), torch.Tensor(tensor2im(self.rec_B, first_only=False)).to(self.device),size_average=False).cpu().float().sum()
+                    
+            total_iters += self.opt.batch_size
+                
+        for metric in self.opt.metrics:
+            if metric == 'SSIM':
+                self.metric_SSIM_fake_A /= total_iters
+                self.metric_SSIM_fake_B /= total_iters
+                self.metric_SSIM_rec_A /= total_iters
+                self.metric_SSIM_rec_B /= total_iters
+            

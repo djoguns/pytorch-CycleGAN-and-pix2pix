@@ -6,7 +6,7 @@ from PIL import Image
 import os
 
 
-def tensor2im(input_image, imtype=np.uint8):
+def tensor2im(input_image, imtype=np.uint8, first_only=True):
     """"Converts a Tensor array into a numpy image array.
 
     Parameters:
@@ -18,14 +18,24 @@ def tensor2im(input_image, imtype=np.uint8):
             image_tensor = input_image.data
         else:
             return input_image
-        image_numpy = image_tensor[0].cpu().float().numpy()  # convert it into a numpy array
+        if first_only:
+            image_numpy = image_tensor[0].cpu().float().numpy()  #take first from batch and convert it into a numpy array
+        else:
+            image_numpy = image_tensor.cpu().float()  # convert it into a numpy array
         if image_numpy.shape[0] == 1:  # grayscale to RGB
             image_numpy = np.tile(image_numpy, (3, 1, 1))
-        image_numpy = (np.transpose(image_numpy, (1, 2, 0)) + 1) / 2.0 * 255.0  # post-processing: tranpose and scaling
+        if first_only:
+            image_numpy = (np.transpose(image_numpy, (1, 2, 0)) + 1) / 2.0 * 255.0  # post-processing: tranpose and scaling
+        else:
+            x = image_numpy.new(*image_numpy.size())
+            x[:, 0, :, :] = (image_numpy[:, 0, :, :] + 1) * 0.5 * 255.0
+            x[:, 1, :, :] = (image_numpy[:, 1, :, :] + 1) * 0.5 * 255.0
+            x[:, 2, :, :] = (image_numpy[:, 2, :, :] + 1) * 0.5 * 255.0
+            image_numpy = np.transpose(x.numpy(), (0, 2, 3, 1))
+            
     else:  # if it is a numpy array, do nothing
         image_numpy = input_image
     return image_numpy.astype(imtype)
-
 
 def diagnose_network(net, name='network'):
     """Calculate and print the mean of average absolute(gradients)

@@ -23,6 +23,7 @@ from options.train_options import TrainOptions
 from data import create_dataset
 from models import create_model
 from util.visualizer import Visualizer
+from util.metrics import *
 
 if __name__ == '__main__':
     opt = TrainOptions().parse()   # get training options
@@ -40,6 +41,7 @@ if __name__ == '__main__':
         iter_data_time = time.time()    # timer for data loading per iteration
         epoch_iter = 0                  # the number of training iterations in current epoch, reset to 0 every epoch
         visualizer.reset()              # reset the visualizer: make sure it saves the results to HTML at least once every epoch
+        
 
         for i, data in enumerate(dataset):  # inner loop within one epoch
             iter_start_time = time.time()  # timer for computation per iteration
@@ -62,17 +64,32 @@ if __name__ == '__main__':
                 visualizer.print_current_losses(epoch, epoch_iter, losses, t_comp, t_data)
                 if opt.display_id > 0:
                     visualizer.plot_current_losses(epoch, float(epoch_iter) / dataset_size, losses)
-
+                    
             if total_iters % opt.save_latest_freq == 0:   # cache our latest model every <save_latest_freq> iterations
                 print('saving the latest model (epoch %d, total_iters %d)' % (epoch, total_iters))
                 save_suffix = 'iter_%d' % total_iters if opt.save_by_iter else 'latest'
                 model.save_networks(save_suffix)
 
             iter_data_time = time.time()
+        
         if epoch % opt.save_epoch_freq == 0:              # cache our model every <save_epoch_freq> epochs
             print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
             model.save_networks('latest')
             model.save_networks(epoch)
 
+            
+        losses = model.get_current_losses()
+        t_comp = (time.time() - iter_start_time) / opt.batch_size
+        visualizer.print_current_losses(epoch, epoch_iter, losses, t_comp, t_data)
+        
+        model.calculate_metrics(dataset)
+        metrics = model.get_current_metrics()
+        t_comp = (time.time() - iter_start_time) / opt.batch_size
+        visualizer.print_current_metrics(epoch, epoch_iter, metrics, t_comp, t_data)
+    
+        if opt.display_id > 0:
+            visualizer.plot_current_losses(epoch, float(epoch_iter) / dataset_size, losses)
+            visualizer.plot_current_metrics(epoch, metrics)
+                            
         print('End of epoch %d / %d \t Time Taken: %d sec' % (epoch, opt.n_epochs + opt.n_epochs_decay, time.time() - epoch_start_time))
         model.update_learning_rate()                     # update learning rates at the end of every epoch.

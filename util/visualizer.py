@@ -134,16 +134,16 @@ class Visualizer():
                 if label_html_row != '':
                     label_html += '<tr>%s</tr>' % label_html_row
                 try:
-                    self.vis.images(images, nrow=ncols, win=self.display_id + 1,
+                    self.vis.images(images, nrow=ncols, win=self.display_id + 2,
                                     padding=2, opts=dict(title=title + ' images'))
                     label_html = '<table>%s</table>' % label_html
-                    self.vis.text(table_css + label_html, win=self.display_id + 2,
+                    self.vis.text(table_css + label_html, win=self.display_id + 3,
                                   opts=dict(title=title + ' labels'))
                 except VisdomExceptionBase:
                     self.create_visdom_connections()
 
             else:     # show each image in a separate visdom panel;
-                idx = 1
+                idx = 2
                 try:
                     for label, image in visuals.items():
                         image_numpy = util.tensor2im(image)
@@ -184,23 +184,52 @@ class Visualizer():
             counter_ratio (float) -- progress (percentage) in the current epoch, between 0 to 1
             losses (OrderedDict)  -- training losses stored in the format of (name, float) pairs
         """
-        if not hasattr(self, 'plot_data'):
-            self.plot_data = {'X': [], 'Y': [], 'legend': list(losses.keys())}
-        self.plot_data['X'].append(epoch + counter_ratio)
-        self.plot_data['Y'].append([losses[k] for k in self.plot_data['legend']])
+        if not hasattr(self, 'plot_data_loss'):
+            self.plot_data_loss = {'X': [], 'Y': [], 'legend': list(losses.keys())}
+        self.plot_data_loss['X'].append(epoch + counter_ratio)
+        self.plot_data_loss['Y'].append([losses[k] for k in self.plot_data_loss['legend']])
         try:
             self.vis.line(
-                X=np.stack([np.array(self.plot_data['X'])] * len(self.plot_data['legend']), 1),
-                Y=np.array(self.plot_data['Y']),
+                X=np.stack([np.array(self.plot_data_loss['X'])] * len(self.plot_data_loss['legend']), 1),
+                Y=np.array(self.plot_data_loss['Y']),
                 opts={
                     'title': self.name + ' loss over time',
-                    'legend': self.plot_data['legend'],
+                    'legend': self.plot_data_loss['legend'],
                     'xlabel': 'epoch',
                     'ylabel': 'loss'},
                 win=self.display_id)
         except VisdomExceptionBase:
             self.create_visdom_connections()
 
+    def plot_current_metrics(self, epoch, metrics):
+        """display the current metrics on visdom display: dictionary of metric names and values
+
+        Parameters:
+            epoch (int)           -- current epoch
+            counter_ratio (float) -- progress (percentage) in the current epoch, between 0 to 1
+            metrics (OrderedDict)  -- metrics stored in the format of (name, float) pairs
+        """
+        if metrics is None:
+            return
+        
+        if not hasattr(self, 'plot_data_metrics'):
+            self.plot_data_metrics = {'X': [], 'Y': [], 'legend': list(metrics.keys())}
+        self.plot_data_metrics['X'].append(epoch)
+        self.plot_data_metrics['Y'].append([metrics[k] for k in self.plot_data_metrics['legend']])
+        try:
+            self.vis.line(
+                X=np.stack([np.array(self.plot_data_metrics['X'])] * len(self.plot_data_metrics['legend']), 1),
+                Y=np.array(self.plot_data_metrics['Y']),
+                opts={
+                    'title': self.name + ' metrics over time',
+                    'legend': self.plot_data_metrics['legend'],
+                    'xlabel': 'epoch',
+                    'ylabel': 'metric'},
+                win=self.display_id + 1)
+        except VisdomExceptionBase:
+            self.create_visdom_connections()
+
+            
     # losses: same format as |losses| of plot_current_losses
     def print_current_losses(self, epoch, iters, losses, t_comp, t_data):
         """print current losses on console; also save the losses to the disk
@@ -214,6 +243,29 @@ class Visualizer():
         """
         message = '(epoch: %d, iters: %d, time: %.3f, data: %.3f) ' % (epoch, iters, t_comp, t_data)
         for k, v in losses.items():
+            message += '%s: %.3f ' % (k, v)
+
+        print(message)  # print the message
+        with open(self.log_name, "a") as log_file:
+            log_file.write('%s\n' % message)  # save the message
+
+            
+    # metrics: same format as |metrics| of plot_current_metrics
+    def print_current_metrics(self, epoch, iters, metrics, t_comp, t_data):
+        """print current metrics on console; also save the losses to the disk
+
+        Parameters:
+            epoch (int) -- current epoch
+            iters (int) -- current training iteration during this epoch (reset to 0 at the end of every epoch)
+            metrics (OrderedDict) -- metrics stored in the format of (name, float) pairs
+            t_comp (float) -- computational time per data point (normalized by batch_size)
+            t_data (float) -- data loading time per data point (normalized by batch_size)
+        """
+        if metrics is None:
+            return
+        
+        message = '(epoch: %d, iters: %d, time: %.3f, data: %.3f) ' % (epoch, iters, t_comp, t_data)
+        for k, v in metrics.items():
             message += '%s: %.3f ' % (k, v)
 
         print(message)  # print the message

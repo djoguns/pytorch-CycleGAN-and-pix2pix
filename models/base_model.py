@@ -74,6 +74,10 @@ class BaseModel(ABC):
     def optimize_parameters(self):
         """Calculate losses, gradients, and update network weights; called in every training iteration"""
         pass
+    
+    def calculate_metrics(self):
+        """Calculate metrics; called after the end of an epoch. Currently only implemented for CycleGANs"""
+        return None
 
     def setup(self, opt):
         """Load and print networks; create schedulers
@@ -140,6 +144,17 @@ class BaseModel(ABC):
                 errors_ret[name] = float(getattr(self, 'loss_' + name))  # float(...) works for both scalar tensor and float number
         return errors_ret
 
+    
+    def get_current_metrics(self):
+        """Return traning losses / errors. train.py will print out these errors on console, and save them to a file"""
+        metrics_ret = OrderedDict()
+        if self.metric_names == []:
+            return None
+        for name in self.metric_names:
+            if isinstance(name, str):
+                metrics_ret[name] = float(getattr(self, 'metric_' + name))  # float(...) works for both scalar tensor and float number
+        return metrics_ret
+    
     def save_networks(self, epoch):
         """Save all the networks to the disk.
 
