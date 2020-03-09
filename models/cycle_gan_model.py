@@ -228,10 +228,10 @@ class CycleGANModel(BaseModel):
             self.forward()
             for metric in self.opt.metrics:
                 if metric == 'SSIM':
-                    self.metric_SSIM_fake_A += ssim(torch.Tensor(tensor2im(self.fake_A, first_only=False)).to(self.device), torch.Tensor(tensor2im(self.real_B, first_only=False)).to(self.device),size_average=False).cpu().float().sum()
-                    self.metric_SSIM_fake_B += ssim(torch.Tensor(tensor2im(self.fake_B, first_only=False)).to(self.device), torch.Tensor(tensor2im(self.real_A, first_only=False)).to(self.device),size_average=False).cpu().float().sum()
-                    self.metric_SSIM_rec_A += ssim(torch.Tensor(tensor2im(self.real_A, first_only=False)).to(self.device), torch.Tensor(tensor2im(self.rec_A, first_only=False)).to(self.device),size_average=False).cpu().float().sum()
-                    self.metric_SSIM_rec_B += ssim(torch.Tensor(tensor2im(self.real_B, first_only=False)).to(self.device), torch.Tensor(tensor2im(self.rec_B, first_only=False)).to(self.device),size_average=False).cpu().float().sum()
+                    self.metric_SSIM_fake_A += ssim(torch.Tensor(tensor2im(self.fake_A, first_only=False)).permute(0,3,1,2).to(self.device), torch.Tensor(tensor2im(self.real_B, first_only=False)).permute(0,3,1,2).to(self.device),size_average=False).cpu().float().sum()
+                    self.metric_SSIM_fake_B += ssim(torch.Tensor(tensor2im(self.fake_B, first_only=False)).permute(0,3,1,2).to(self.device), torch.Tensor(tensor2im(self.real_A, first_only=False)).permute(0,3,1,2).to(self.device),size_average=False).cpu().float().sum()
+                    self.metric_SSIM_rec_A += ssim(torch.Tensor(tensor2im(self.real_A, first_only=False)).permute(0,3,1,2).to(self.device), torch.Tensor(tensor2im(self.rec_A, first_only=False)).permute(0,3,1,2).to(self.device),size_average=False).cpu().float().sum()
+                    self.metric_SSIM_rec_B += ssim(torch.Tensor(tensor2im(self.real_B, first_only=False)).permute(0,3,1,2).to(self.device), torch.Tensor(tensor2im(self.rec_B, first_only=False)).permute(0,3,1,2).to(self.device),size_average=False).cpu().float().sum()
                     
             total_iters += self.opt.batch_size
                 
