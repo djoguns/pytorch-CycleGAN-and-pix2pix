@@ -65,7 +65,9 @@ class CycleGANModel(BaseModel):
             for metric in opt.metrics:
                 if metric == "SSIM":
                     self.metric_names += ['SSIM_fake_A', 'SSIM_fake_B', 'SSIM_rec_A', 'SSIM_rec_B']
-        #TODO: Add PSNR
+                if metric =="PSNR":
+                    self.metric_names += ['PSNR_fake_A', 'PSNR_fake_B', 'PSNR_rec_A', 'PSNR_rec_B']
+                
 
         # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
         visual_names_A = ['real_A', 'fake_B', 'rec_A']
@@ -210,7 +212,6 @@ class CycleGANModel(BaseModel):
 
     def calculate_metrics(self,dataset):
         """Calculate metrics; called after the end of an epoch. Currently only implemented for CycleGANs"""
-        #TODO: ADD PSNR metric as well
         if self.opt.metrics is None:
             return
         for metric in self.opt.metrics:
@@ -220,8 +221,10 @@ class CycleGANModel(BaseModel):
                 self.metric_SSIM_rec_A = 0
                 self.metric_SSIM_rec_B = 0
             if metric == 'PSNR':
-                self.metric_PSNR_A = 0
-                self.metric_PSNR_B = 0
+                self.metric_PSNR_fake_A = 0
+                self.metric_PSNR_fake_B = 0
+                self.metric_PSNR_rec_A = 0
+                self.metric_PSNR_rec_B = 0
         total_iters = 0
         for i, data in enumerate(dataset):
             self.set_input(data)
@@ -232,7 +235,13 @@ class CycleGANModel(BaseModel):
                     self.metric_SSIM_fake_B += ssim(torch.Tensor(tensor2im(self.fake_B, first_only=False)).permute(0,3,1,2).to(self.device), torch.Tensor(tensor2im(self.real_A, first_only=False)).permute(0,3,1,2).to(self.device),size_average=False).cpu().float().sum()
                     self.metric_SSIM_rec_A += ssim(torch.Tensor(tensor2im(self.real_A, first_only=False)).permute(0,3,1,2).to(self.device), torch.Tensor(tensor2im(self.rec_A, first_only=False)).permute(0,3,1,2).to(self.device),size_average=False).cpu().float().sum()
                     self.metric_SSIM_rec_B += ssim(torch.Tensor(tensor2im(self.real_B, first_only=False)).permute(0,3,1,2).to(self.device), torch.Tensor(tensor2im(self.rec_B, first_only=False)).permute(0,3,1,2).to(self.device),size_average=False).cpu().float().sum()
-                    
+                
+                if metric == 'PSNR':
+                    self.metric_PSNR_fake_A += psnr(torch.Tensor(tensor2im(self.fake_A, first_only=False)).permute(0,3,1,2).to(self.device), torch.Tensor(tensor2im(self.real_B, first_only=False)).permute(0,3,1,2).to(self.device)).cpu().float().sum()
+                    self.metric_PSNR_fake_B += psnr(torch.Tensor(tensor2im(self.fake_B, first_only=False)).permute(0,3,1,2).to(self.device), torch.Tensor(tensor2im(self.real_A, first_only=False)).permute(0,3,1,2).to(self.device)).cpu().float().sum()
+                    self.metric_PSNR_rec_A += psnr(torch.Tensor(tensor2im(self.real_A, first_only=False)).permute(0,3,1,2).to(self.device), torch.Tensor(tensor2im(self.rec_A, first_only=False)).permute(0,3,1,2).to(self.device)).cpu().float().sum()
+                    self.metric_PSNR_rec_B += psnr(torch.Tensor(tensor2im(self.real_B, first_only=False)).permute(0,3,1,2).to(self.device), torch.Tensor(tensor2im(self.rec_B, first_only=False)).permute(0,3,1,2).to(self.device)).cpu().float().sum() 
+                
             total_iters += self.opt.batch_size
                 
         for metric in self.opt.metrics:
@@ -242,3 +251,8 @@ class CycleGANModel(BaseModel):
                 self.metric_SSIM_rec_A /= total_iters
                 self.metric_SSIM_rec_B /= total_iters
             
+            if metric == 'PSNR':
+                self.metric_PSNR_fake_A /= total_iters
+                self.metric_PSNR_fake_B /= total_iters
+                self.metric_PSNR_rec_A /= total_iters
+                self.metric_PSNR_rec_B /= total_iters

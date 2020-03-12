@@ -38,37 +38,10 @@ def _ssim(img1, img2, window, window_size, channel, data_range=255., padding=Fal
         return ssim_map.mean()
     else:
         return ssim_map.mean(1).mean(1).mean(1)
-    
-class SSIM(torch.nn.Module):
+
+
+def ssim(img1, img2, window_size = 11, data_range=255., padding = False, size_average = True):
     "Structural similarity index (SSIM) is a commonly used metric for CycleGAN experiments as it evaluates the preservation of content rather than style"
-    def __init__(self, window_size = 11, data_range=255, padding = False, size_average = True):
-        super(SSIM, self).__init__()
-        self.window_size = window_size
-        self.size_average = size_average
-        self.data_range = data_range
-        self.padding = padding
-        self.channel = 1
-        self.window = create_window(window_size, self.channel)
-
-    def forward(self, img1, img2):
-        (_, channel, _, _) = img1.size()
-
-        if channel == self.channel and self.window.data.type() == img1.data.type():
-            window = self.window
-        else:
-            window = create_window(self.window_size, channel)
-            
-            if img1.is_cuda:
-                window = window.cuda(img1.get_device())
-            window = window.type_as(img1)
-            
-            self.window = window
-            self.channel = channel
-
-
-        return _ssim(img1, img2, window, self.window_size, channel, self.data_range, padding, self.size_average)
-
-def ssim(img1, img2, window_size = 11, data_range=255, padding = False, size_average = True):
     (_, channel, _, _) = img1.size()
     window = create_window(window_size, channel)
     
@@ -77,3 +50,8 @@ def ssim(img1, img2, window_size = 11, data_range=255, padding = False, size_ave
     window = window.type_as(img1)
     
     return _ssim(img1, img2, window, window_size, channel, data_range, padding, size_average)
+
+
+def psnr(pred, targs, data_range=255.):
+    mse = F.mse_loss(pred, targs)
+    return 20 * torch.log10(data_range / torch.sqrt(mse))
